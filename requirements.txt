@@ -1,0 +1,13 @@
+streamlit
+groq
+requests
+edge-tts
+supabase
+numpy==1.26.4
+pandas
+fpdf
+psutil
+celery==5.3.6
+redis
+scikit-learn
+psycopg2-binary==2.9.9

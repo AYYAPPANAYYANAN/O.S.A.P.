@@ -1,0 +1,61 @@
+services:
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  db:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_USER=omniguard
+      - POSTGRES_PASSWORD=securepassword123
+      - POSTGRES_DB=omniguard_rl
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U omniguard -d omniguard_rl"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  zap_judge:
+    image: ghcr.io/zaproxy/zaproxy:stable
+    command: zap.sh -daemon -host 0.0.0.0 -port 8080 -config api.disablekey=true -config api.addrs.addr.name=.* -config api.addrs.addr.regex=true
+    ports:
+      - "8080:8080"
+
+  app:
+    build: .
+    ports:
+      - "8501:8501"
+    env_file: .env
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - DATABASE_URL=postgresql://omniguard:securepassword123@db:5432/omniguard_rl
+      - ZAP_URL=http://zap_judge:8080
+    depends_on:
+      redis:
+        condition: service_healthy
+      db:
+        condition: service_healthy
+
+  worker:
+    build: .
+    command: celery -A tasks worker --loglevel=info
+    env_file: .env
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - ZAP_URL=http://zap_judge:8080
+    depends_on:
+      redis:
+        condition: service_healthy
+
+volumes:
+  pgdata:
